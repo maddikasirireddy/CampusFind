@@ -16,8 +16,50 @@ const activityRouter = require('./activity');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Helmet for security headers
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: '*', credentials: true }));
+
+// ── Strict CORS Configuration ───────────────────────────────────────────────
+// Allow approved development origins + explicitly configured production frontend origin(s)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+
+if (process.env.FRONTEND_URL) {
+  // Can be comma-separated list of origins
+  process.env.FRONTEND_URL.split(',').forEach((url) => {
+    const trimmed = url.trim();
+    if (trimmed && !allowedOrigins.includes(trimmed)) {
+      allowedOrigins.push(trimmed);
+    }
+  });
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. mobile apps, Electron file://, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // In development mode, allow matching localhost subdomains or tunnel testing
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(morgan(process.env.NODE_ENV === 'test' ? 'silent' : 'dev'));
 
@@ -38,6 +80,9 @@ app.use((req, res) => res.status(404).json({ error: `Route ${req.path} not found
 
 // Error handler
 app.use((err, req, res, _next) => {
+  if (err.message && err.message.startsWith('CORS blocked')) {
+    return res.status(403).json({ error: err.message });
+  }
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });

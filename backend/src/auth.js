@@ -2,13 +2,20 @@
 // Authentication middleware & Auth endpoints (register, login, me, profile, change-password).
 
 const express = require('express');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { query } = require('./db');
 
 const router = express.Router();
-const SECRET = process.env.JWT_SECRET || 'campusfind_secret';
+const isProduction = process.env.NODE_ENV === 'production';
+
+// In production, enforce that JWT_SECRET is explicitly set and sufficiently strong
+if (isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
+  throw new Error('FATAL: A strong JWT_SECRET (at least 32 characters) must be set in production.');
+}
+
+const SECRET = process.env.JWT_SECRET || (isProduction ? null : 'campusfind_dev_insecure_secret_key');
 const EXPIRES = process.env.JWT_EXPIRES_IN || '7d';
 const ROUNDS = 10;
 
@@ -59,6 +66,7 @@ function safeUser(u) {
 }
 
 // POST /api/auth/register
+// Student registration: explicitly forces role to 'student' to prevent privilege escalation
 router.post(
   '/register',
   [
@@ -81,8 +89,8 @@ router.post(
 
       const hash = await bcrypt.hash(password, ROUNDS);
       const result = await query(
-        `INSERT INTO users (name, email, password, student_id, phone)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        `INSERT INTO users (name, email, password, student_id, phone, role)
+         VALUES ($1, $2, $3, $4, $5, 'student') RETURNING *`,
         [name, email, hash, student_id, phone || null]
       );
 
