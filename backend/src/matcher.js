@@ -40,13 +40,32 @@ const SYNONYMS = {
   id: 'idcard',
   idcard: 'idcard',
   keys: 'keys',
-  keychain: 'keys'
+  key: 'keys',
+  keychain: 'keys',
+  tumbler: 'bottle',
+  pendrive: 'usb',
+  usb: 'usb',
+  smartwatch: 'watch',
+  watch: 'watch',
+  grey: 'gray',
+  gray: 'gray'
 };
+
+// Filler words that carry no matching value
+const STOPWORDS = new Set([
+  'the', 'an', 'in', 'on', 'at', 'near', 'with', 'and', 'of', 'my', 'is', 'was', 'are',
+  'lost', 'found', 'item', 'has', 'have', 'from', 'by', 'to', 'for', 'it', 'this', 'that',
+  'there', 'around', 'inside', 'left', 'please', 'contact', 'me'
+]);
 
 function normaliseWord(word) {
   const clean = word.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!clean || clean.length < 2) return null;
-  return SYNONYMS[clean] || clean;
+  if (STOPWORDS.has(clean)) return null;
+  if (SYNONYMS[clean]) return SYNONYMS[clean];
+  // simple plural handling: keys -> key, bottles -> bottle
+  const singular = clean.length > 3 && clean.endsWith('s') && !clean.endsWith('ss') ? clean.slice(0, -1) : clean;
+  return SYNONYMS[singular] || singular;
 }
 
 function tokenise(str) {
@@ -80,16 +99,19 @@ function textSimilarity(a, b) {
     }
   }
 
+  // Overlap-based: a longer description on one side no longer lowers the score
+  const overlap = shared / Math.min(setA.size, setB.size);
   const union = setA.size + setB.size - shared;
-  return union > 0 ? Math.min(1, shared / union) : 0;
+  const jaccard = union > 0 ? shared / union : 0;
+  return Math.min(1, 0.7 * overlap + 0.3 * jaccard);
 }
 
 function dateSimilarity(d1, d2) {
   if (!d1 || !d2) return 0.2;
   const diff = Math.abs(new Date(d1) - new Date(d2)) / 86400000;
-  if (diff <= 1)  return 1.0;
-  if (diff <= 3)  return 0.8;
-  if (diff <= 7)  return 0.6;
+  if (diff <= 1) return 1.0;
+  if (diff <= 3) return 0.8;
+  if (diff <= 7) return 0.6;
   if (diff <= 14) return 0.4;
   if (diff <= 30) return 0.2;
   return 0;
@@ -105,6 +127,7 @@ function dateSimilarity(d1, d2) {
  */
 function scoreItems(a, b) {
   let score = 0;
+  let maxPoints = 100; // reduced when an optional field is empty on either item
   const factors = [];
 
   // 1. Main Category: 20 points
@@ -120,12 +143,14 @@ function scoreItems(a, b) {
     const subcatPoints = Math.round(subcatSim * 20);
     score += subcatPoints;
     if (subcatPoints >= 6) factors.push('Matching subcategory');
+  } else {
+    maxPoints -= 20; // optional field missing: don't penalise
   }
 
   // 3. Title & Description similarity: 30 points
   const textA = `${a.title || ''} ${a.description || ''} ${a.tags || ''} ${a.color || ''} ${a.brand || ''}`;
   const textB = `${b.title || ''} ${b.description || ''} ${b.tags || ''} ${b.color || ''} ${b.brand || ''}`;
-  const descSim = textSimilarity(textA, textB);
+  const descSim = Math.min(1, textSimilarity(textA, textB) * 1.1);
   const descPoints = Math.round(descSim * 30);
   score += descPoints;
   if (descPoints >= 12) factors.push('Similar description');
@@ -144,6 +169,8 @@ function scoreItems(a, b) {
     // Both specified custom locations without matching campus location
     const specLocSim = textSimilarity(a.custom_location, b.custom_location);
     locPoints += Math.round(specLocSim * 12);
+  } else if (!(a.location_id && b.location_id) && !(a.custom_location && b.custom_location)) {
+    maxPoints -= 20; // no comparable location info: don't penalise
   }
   score += locPoints;
   if (locPoints >= 10) factors.push('Nearby location');
@@ -153,6 +180,12 @@ function scoreItems(a, b) {
   const datePoints = Math.round(ds * 10);
   score += datePoints;
   if (datePoints >= 8) factors.push('Close date');
+
+  // Rescale over the points that were actually available
+  score = Math.round((score / maxPoints) * 100);
+
+  // Same category/place/date alone isn't a real match: no text in common keeps it low
+  if (descSim < 0.15) score = Math.min(score, 25);
 
   return {
     score: Math.min(score, 100),
@@ -181,7 +214,7 @@ async function runMatching(itemId) {
     const { score, factors } = scoreItems(item, candidate);
     if (score < 30) continue;
 
-    const lostId  = item.type === 'lost' ? item.id : candidate.id;
+    const lostId = item.type === 'lost' ? item.id : candidate.id;
     const foundId = item.type === 'lost' ? candidate.id : item.id;
 
     await query(
