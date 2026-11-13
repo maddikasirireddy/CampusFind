@@ -7,6 +7,18 @@ import { useAuth } from '../context/AuthContext.jsx';
 import api from '../utils/api.js';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  IconArrowLeft,
+  IconClose,
+  IconCheck,
+  IconMapPin,
+  IconFolder,
+  IconTag,
+  IconCalendar,
+  IconUser,
+  ScoreRing,
+  IconArrowRight
+} from '../components/Icons.jsx';
 
 function ClaimModal({ item, onClose, onSuccess }) {
   const [form, setForm] = useState({ message: '', proof: '' });
@@ -31,7 +43,9 @@ function ClaimModal({ item, onClose, onSuccess }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Claim Item Ownership</h3>
-          <button className="btn-icon" onClick={onClose}>✕</button>
+          <button className="btn-icon" onClick={onClose} aria-label="Close modal">
+            <IconClose width={18} height={18} />
+          </button>
         </div>
         <form onSubmit={submit}>
           <div className="modal-body">
@@ -60,7 +74,7 @@ function ClaimModal({ item, onClose, onSuccess }) {
             </div>
           </div>
           <div className="modal-footer">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Submitting…' : 'Submit Claim'}
             </button>
@@ -115,7 +129,9 @@ function EditModal({ item, categories, locations, onClose, onSaved }) {
       <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Edit Item Report</h3>
-          <button className="btn-icon" onClick={onClose}>✕</button>
+          <button className="btn-icon" onClick={onClose} aria-label="Close modal">
+            <IconClose width={18} height={18} />
+          </button>
         </div>
         <form onSubmit={submit}>
           <div className="modal-body">
@@ -159,10 +175,10 @@ function EditModal({ item, categories, locations, onClose, onSaved }) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Specific Location / Landmark</label>
+                <label className="form-label">Specific Location</label>
                 <input
                   className="form-control"
-                  placeholder="e.g. 2nd Floor Reading Area, Table 5"
+                  placeholder="e.g. 2nd Floor Reading Area"
                   value={form.custom_location}
                   onChange={setField('custom_location')}
                 />
@@ -171,29 +187,40 @@ function EditModal({ item, categories, locations, onClose, onSaved }) {
 
             <div className="form-row">
               <div className="form-group">
+                <label className="form-label">Date</label>
+                <input className="form-control" type="date" value={form.date_occurred} onChange={setField('date_occurred')} />
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Status</label>
                 <select className="form-control" value={form.status} onChange={setField('status')}>
                   <option value="active">Active</option>
                   <option value="claimed">Claimed</option>
                   <option value="returned">Returned</option>
-                  <option value="closed">Closed</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Colour</label>
+                <input className="form-control" value={form.color} onChange={setField('color')} />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Date</label>
-                <input
-                  className="form-control"
-                  type="date"
-                  value={form.date_occurred}
-                  onChange={setField('date_occurred')}
-                />
+                <label className="form-label">Brand</label>
+                <input className="form-control" value={form.brand} onChange={setField('brand')} />
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Tags</label>
+              <input className="form-control" value={form.tags} onChange={setField('tags')} />
             </div>
           </div>
 
           <div className="modal-footer">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Saving…' : 'Save Changes'}
             </button>
@@ -206,110 +233,130 @@ function EditModal({ item, categories, locations, onClose, onSaved }) {
 
 export default function ItemDetail() {
   const { id } = useParams();
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [item, setItem] = useState(null);
-  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showClaim, setShowClaim] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
+  const [matches, setMatches] = useState([]);
 
   useEffect(() => {
     Promise.all([
       api.get(`/items/${id}`),
-      api.get(`/matches/item/${id}`).catch(() => ({ data: { matches: [] } })),
       api.get('/items/lookup/categories').catch(() => ({ data: { categories: [] } })),
       api.get('/items/lookup/locations').catch(() => ({ data: { locations: [] } })),
-    ]).then(([ir, mr, cr, lr]) => {
-      setItem(ir.data.item);
-      setMatches(mr.data.matches || []);
-      setCategories(cr.data.categories || []);
-      setLocations(lr.data.locations || []);
-    }).catch(() => {
-      toast.error('Failed to load item');
-      navigate('/items');
-    }).finally(() => setLoading(false));
+      api.get(`/matches/item/${id}`).catch(() => ({ data: { matches: [] } })),
+    ])
+      .then(([ir, cr, lr, mr]) => {
+        setItem(ir.data.item);
+        setCategories(cr.data.categories || []);
+        setLocations(lr.data.locations || []);
+        setMatches(mr.data.matches || []);
+      })
+      .catch(err => {
+        toast.error('Item not found');
+        navigate('/items');
+      })
+      .finally(() => setLoading(false));
   }, [id, navigate]);
 
-  async function deleteItem() {
+  async function handleDelete() {
     if (!window.confirm('Delete this report permanently?')) return;
     try {
       await api.delete(`/items/${id}`);
-      toast.success('Item deleted');
+      toast.success('Report deleted');
       navigate('/items');
-    } catch {
+    } catch (err) {
       toast.error('Failed to delete item');
     }
   }
 
-  if (loading) return <div className="loading-center"><div className="spinner" /></div>;
+  async function handleMarkReturned() {
+    try {
+      const res = await api.put(`/items/${id}`, { status: 'returned' });
+      setItem(res.data.item);
+      toast.success('Marked as returned! Great job!');
+    } catch (err) {
+      toast.error('Failed to update status');
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="loading-center">
+        <div className="spinner" />
+        <p className="text-sm">Loading report details…</p>
+      </div>
+    );
+  }
+
   if (!item) return null;
 
-  const isOwner = user?.id === item.user_id || user?.role === 'admin';
-  const canClaim = item.type === 'found' && item.status === 'active' && user?.id !== item.user_id;
+  const isOwner = user?.id === item.user_id;
+  const isAdmin = user?.role === 'admin';
+  const canEdit = isOwner || isAdmin;
 
   return (
-    <div style={{ maxWidth: 760 }}>
-      {showClaim && (
-        <ClaimModal
-          item={item}
-          onClose={() => setShowClaim(false)}
-          onSuccess={() => { setShowClaim(false); setItem(i => ({ ...i, status: 'claimed' })); }}
-        />
-      )}
-
-      {showEdit && (
-        <EditModal
-          item={item}
-          categories={categories}
-          locations={locations}
-          onClose={() => setShowEdit(false)}
-          onSaved={updated => { setItem(updated); setShowEdit(false); }}
-        />
-      )}
-
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)}>← Back</button>
-            <span className={`badge badge-${item.type}`}>
-              {item.type === 'lost' ? '🔴 Lost Item' : '🟢 Found Item'}
-            </span>
-            <span className={`badge badge-${item.status}`}>{item.status}</span>
-          </div>
-          <h1>{item.category_icon || '📦'} {item.title}</h1>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          {canClaim && (
-            <button className="btn btn-primary" onClick={() => setShowClaim(true)}>
-              📋 Claim This Item
-            </button>
-          )}
-          {isOwner && (
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowEdit(true)}>
-              ✏️ Edit
-            </button>
-          )}
-          {isOwner && (
-            <button className="btn btn-danger btn-sm" onClick={deleteItem}>
-              🗑️ Delete
-            </button>
-          )}
-        </div>
+    <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      {/* Back button */}
+      <div style={{ marginBottom: 18 }}>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => navigate(-1)}
+        >
+          <IconArrowLeft width={14} height={14} />
+          <span>Back</span>
+        </button>
       </div>
 
-      <div className="card mb-4">
-        <div className="card-body">
-          <div className="detail-section">
-            <h4 className="mb-2">Description</h4>
-            <p style={{ whiteSpace: 'pre-wrap' }}>{item.description}</p>
+      {/* Main card */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className={`badge badge-${item.type}`}>
+              {item.type === 'lost' ? 'Lost Item' : 'Found Item'}
+            </span>
+            <span className={`badge badge-${item.status}`}>
+              {item.status}
+            </span>
           </div>
 
-          <div className="detail-grid mt-3">
+          <div style={{ display: 'flex', gap: 8 }}>
+            {canEdit && (
+              <>
+                <button className="btn btn-secondary btn-sm" onClick={() => setEditOpen(true)}>
+                  Edit
+                </button>
+                {item.status !== 'returned' && (
+                  <button className="btn btn-primary btn-sm" onClick={handleMarkReturned}>
+                    <IconCheck width={14} height={14} />
+                    <span>Mark Returned</span>
+                  </button>
+                )}
+                <button className="btn btn-danger btn-sm" onClick={handleDelete}>
+                  Delete
+                </button>
+              </>
+            )}
+
+            {!isOwner && item.type === 'found' && item.status === 'active' && (
+              <button className="btn btn-primary" onClick={() => setClaimOpen(true)}>
+                Claim Ownership
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="card-body">
+          <h1 style={{ fontSize: '1.75rem', marginBottom: 12 }}>{item.title}</h1>
+          <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.95rem' }}>{item.description}</p>
+
+          <div className="detail-grid mt-4">
             <div className="detail-field">
               <label>Category & Subcategory</label>
               <p>
@@ -320,10 +367,10 @@ export default function ItemDetail() {
             </div>
 
             <div className="detail-field">
-              <label>Campus Location & Specific Spot</label>
+              <label>Location & Landmark</label>
               <p>
                 {item.location_name
-                  ? `📍 ${item.location_name}${item.custom_location ? ` (${item.custom_location})` : ''}`
+                  ? `${item.location_name}${item.custom_location ? ` (${item.custom_location})` : ''}`
                   : item.custom_location || 'Not specified'}
               </p>
             </div>
@@ -350,18 +397,20 @@ export default function ItemDetail() {
           </div>
 
           {item.tags && (
-            <div className="mt-3">
-              <label className="form-label" style={{ fontSize: '.75rem' }}>Tags</label>
+            <div className="mt-4">
+              <label className="form-label" style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#4B5563' }}>Keywords / Tags</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                 {item.tags.split(',').map(t => t.trim()).filter(Boolean).map(t => (
                   <span
                     key={t}
                     style={{
-                      background: 'var(--gray-100)',
-                      color: 'var(--gray-700)',
-                      padding: '3px 10px',
-                      borderRadius: 999,
-                      fontSize: '.75rem'
+                      background: 'var(--bg-page)',
+                      color: 'var(--text-body)',
+                      padding: '4px 12px',
+                      borderRadius: 'var(--radius-pill)',
+                      fontSize: '.8rem',
+                      border: '1px solid var(--border-card)',
+                      fontWeight: 500
                     }}
                   >
                     #{t}
@@ -374,65 +423,95 @@ export default function ItemDetail() {
       </div>
 
       {/* Reporter Contact Info */}
-      <div className="card mb-4">
+      <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <h3>Reported By</h3>
         </div>
-        <div className="card-body" style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <div className="card-body" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <div style={{
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             borderRadius: '50%',
             background: 'var(--primary)',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontWeight: 700
+            fontWeight: 700,
+            fontSize: '1.1rem',
+            fontFamily: 'var(--font-heading)'
           }}>
             {item.reporter_name?.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() || '??'}
           </div>
           <div>
-            <div className="font-semibold">{item.reporter_name}</div>
+            <div className="font-semibold" style={{ fontSize: '1.05rem' }}>{item.reporter_name}</div>
             <div className="text-sm text-muted">{item.reporter_email}</div>
-            {item.reporter_phone && <div className="text-sm text-muted">📞 {item.reporter_phone}</div>}
+            {item.reporter_phone && <div className="text-sm text-muted mt-1">📞 {item.reporter_phone}</div>}
           </div>
         </div>
       </div>
 
-      {/* Matches */}
+      {/* Matches Redesign */}
       {matches.length > 0 && (
         <div className="card">
           <div className="card-header">
-            <h3>🔗 System Matches ({matches.length})</h3>
+            <h3>Automated System Matches ({matches.length})</h3>
           </div>
           <div className="card-body">
             {matches.map(m => {
               const score = parseFloat(m.score);
+              const targetId = item.id === m.lost_id ? m.found_id : m.lost_id;
               return (
                 <div key={m.id} className="match-card">
                   <div className="match-card-header">
-                    <span className="text-sm font-semibold text-muted">Match Relevance</span>
-                    <span className="match-score">{score.toFixed(0)}%</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <ScoreRing score={score} size={48} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Match Relevance</div>
+                        <div className="text-xs text-muted">Algorithm calculated probability</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => navigate(`/items/${targetId}`)}
+                    >
+                      <span>Review</span>
+                      <IconArrowRight width={14} height={14} />
+                    </button>
                   </div>
+
                   <div className="match-body">
                     <div className="match-item">
-                      <span className="badge badge-lost mb-1">🔴 Lost</span>
+                      <span className="badge badge-lost mb-2">Lost Item</span>
                       <h4>{m.lost_title}</h4>
-                      <p>{m.lost_desc}</p>
-                      <p className="text-xs text-muted mt-1">by {m.lost_reporter}</p>
+                      <p className="text-xs text-muted">{m.lost_desc}</p>
+                      {m.lost_specific_location && (
+                        <div className="text-xs text-muted mt-1">📍 {m.lost_specific_location}</div>
+                      )}
+                      <div className="text-xs text-muted mt-2">by {m.lost_reporter}</div>
                     </div>
-                    <div className="match-divider">⇔</div>
+
+                    <div className="match-divider">
+                      <IconArrowRight width={18} height={18} />
+                    </div>
+
                     <div className="match-item">
-                      <span className="badge badge-found mb-1">🟢 Found</span>
+                      <span className="badge badge-found mb-2">Found Item</span>
                       <h4>{m.found_title}</h4>
-                      <p>{m.found_desc}</p>
-                      <p className="text-xs text-muted mt-1">by {m.found_reporter}</p>
+                      <p className="text-xs text-muted">{m.found_desc}</p>
+                      {m.found_specific_location && (
+                        <div className="text-xs text-muted mt-1">📍 {m.found_specific_location}</div>
+                      )}
+                      <div className="text-xs text-muted mt-2">by {m.found_reporter}</div>
                     </div>
                   </div>
+
                   {m.factors && (
-                    <div style={{ padding: '0 16px 12px', fontSize: '.78rem', color: 'var(--primary)', fontWeight: 600 }}>
-                      Factors: {m.factors}
+                    <div className="match-footer">
+                      <span className="match-factors">
+                        Factors: {m.factors}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -440,6 +519,27 @@ export default function ItemDetail() {
             })}
           </div>
         </div>
+      )}
+
+      {claimOpen && (
+        <ClaimModal
+          item={item}
+          onClose={() => setClaimOpen(false)}
+          onSuccess={() => setClaimOpen(false)}
+        />
+      )}
+
+      {editOpen && (
+        <EditModal
+          item={item}
+          categories={categories}
+          locations={locations}
+          onClose={() => setEditOpen(false)}
+          onSaved={updated => {
+            setItem(updated);
+            setEditOpen(false);
+          }}
+        />
       )}
     </div>
   );

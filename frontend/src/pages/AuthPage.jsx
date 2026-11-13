@@ -1,10 +1,11 @@
 // frontend/src/pages/AuthPage.jsx
-// Consolidated Login and Student Registration screen.
+// Consolidated Login and Student Registration screen with modern warm Indigo aesthetic.
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import toast from 'react-hot-toast';
+import { IconSearch } from '../components/Icons.jsx';
 
 export default function AuthPage() {
   const { login, register } = useAuth();
@@ -52,14 +53,17 @@ export default function AuthPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card" style={{ maxWidth: isLogin ? 420 : 480 }}>
+      <div className="auth-card" style={{ maxWidth: isLogin ? 440 : 500 }}>
         <div className="auth-logo">
-          <h1>🔍 CampusFind</h1>
+          <div className="auth-logo-badge">
+            <IconSearch width={28} height={28} strokeWidth={2.5} />
+          </div>
+          <h1>CampusFind</h1>
           <p>Smart Lost & Found Management System</p>
         </div>
 
         {/* Mode Switch Tabs */}
-        <div className="type-toggle mb-3">
+        <div className="type-toggle mb-4">
           <button
             type="button"
             className={`type-btn ${isLogin ? 'active font-bold' : ''}`}
@@ -78,12 +82,14 @@ export default function AuthPage() {
 
         {error && (
           <div style={{
-            background: '#FEE2E2',
-            color: '#991B1B',
-            padding: '10px 14px',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: 16,
-            fontSize: '.85rem'
+            background: 'var(--danger-light)',
+            color: 'var(--danger-dark)',
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 18,
+            fontSize: '.85rem',
+            border: '1px solid #FECACA',
+            fontWeight: 500
           }}>
             {error}
           </div>
@@ -153,24 +159,10 @@ export default function AuthPage() {
             </div>
           )}
 
-          <button className="btn btn-primary w-full btn-lg mt-2" type="submit" disabled={loading}>
+          <button className="btn btn-primary w-full btn-lg mt-3" type="submit" disabled={loading}>
             {loading ? 'Processing…' : (isLogin ? 'Sign In' : 'Create Student Account')}
           </button>
         </form>
-
-        <div style={{
-          marginTop: 20,
-          padding: '10px 14px',
-          background: 'var(--gray-50)',
-          borderRadius: 'var(--radius-sm)',
-          fontSize: '.78rem',
-          color: 'var(--gray-500)',
-          border: '1px solid var(--gray-200)'
-        }}>
-          <strong>Demo credentials:</strong><br />
-          Admin: <code>admin@campusfind.edu</code> / <code>Admin@123</code><br />
-          Student: <code>aarav@campus.edu</code> / <code>Test@123</code>
-        </div>
       </div>
     </div>
   );

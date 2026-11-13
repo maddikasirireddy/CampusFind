@@ -2,19 +2,29 @@
 // Browse lost & found reports with Category, Subcategory, Location, and Specific Location details.
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../utils/api.js';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  IconSearch,
+  IconPlus,
+  IconMapPin,
+  IconTag,
+  IconFolder,
+  IconArrowLeft,
+  IconArrowRight,
+  IconFilter
+} from '../components/Icons.jsx';
 
 function ItemCard({ item, onClick }) {
   return (
-    <div className="item-card" onClick={onClick}>
+    <div className="item-card" onClick={onClick} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && onClick()}>
       <div className="item-card-header">
-        <div className="cat-icon">{item.category_icon || '📦'}</div>
-        <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
+        <div className="cat-tile">{item.category_icon || '📦'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="item-card-title">{item.title}</div>
-          <span className={`badge badge-${item.type}`} style={{ marginTop: 3 }}>
-            {item.type === 'lost' ? '🔴 Lost' : '🟢 Found'}
+          <span className={`badge badge-${item.type}`} style={{ marginTop: 6 }}>
+            {item.type === 'lost' ? 'Lost' : 'Found'}
           </span>
         </div>
         <span className={`badge badge-${item.status}`}>{item.status}</span>
@@ -24,16 +34,34 @@ function ItemCard({ item, onClick }) {
         <div className="item-card-desc">{item.description}</div>
         <div className="item-card-meta">
           {item.category_name && (
-            <span>📂 {item.category_name}{item.custom_subcategory ? ` › ${item.custom_subcategory}` : ''}</span>
+            <span className="meta-chip">
+              <IconFolder width={12} height={12} />
+              <span>{item.category_name}{item.custom_subcategory ? ` › ${item.custom_subcategory}` : ''}</span>
+            </span>
           )}
           {item.location_name && (
-            <span>📍 {item.location_name}{item.custom_location ? ` (${item.custom_location})` : ''}</span>
+            <span className="meta-chip">
+              <IconMapPin width={12} height={12} />
+              <span>{item.location_name}{item.custom_location ? ` (${item.custom_location})` : ''}</span>
+            </span>
           )}
           {!item.location_name && item.custom_location && (
-            <span>📍 {item.custom_location}</span>
+            <span className="meta-chip">
+              <IconMapPin width={12} height={12} />
+              <span>{item.custom_location}</span>
+            </span>
           )}
-          {item.color && <span>🎨 {item.color}</span>}
-          {item.brand && <span>🏷️ {item.brand}</span>}
+          {item.color && (
+            <span className="meta-chip">
+              <span>Color: {item.color}</span>
+            </span>
+          )}
+          {item.brand && (
+            <span className="meta-chip">
+              <IconTag width={12} height={12} />
+              <span>{item.brand}</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -47,14 +75,17 @@ function ItemCard({ item, onClick }) {
 
 export default function ItemsPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+
+  const [items, setItems]       = useState([]);
+  const [total, setTotal]       = useState(0);
+  const [page, setPage]         = useState(1);
+  const [pages, setPages]       = useState(1);
+  const [loading, setLoading]   = useState(false);
 
   const [categories, setCategories] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [locations, setLocations]   = useState([]);
 
   const [filters, setFilters] = useState({
     type: '',
@@ -62,10 +93,19 @@ export default function ItemsPage() {
     subcategory: '',
     location_id: '',
     status: '',
-    keyword: '',
+    keyword: initialSearch,
     date_from: '',
     date_to: '',
   });
+
+  // Sync keyword if URL search param updates from top bar
+  useEffect(() => {
+    const q = searchParams.get('search');
+    if (q !== null && q !== filters.keyword) {
+      setFilters(prev => ({ ...prev, keyword: q }));
+      setPage(1);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     api.get('/items/lookup/categories').then(r => setCategories(r.data.categories)).catch(() => {});
@@ -117,33 +157,40 @@ export default function ItemsPage() {
       <div className="page-header">
         <div>
           <h1>Browse Items</h1>
-          <p className="text-muted text-sm mt-1">{total} report{total !== 1 ? 's' : ''} listed</p>
+          <p className="text-muted text-sm mt-1">{total} report{total !== 1 ? 's' : ''} listed across campus</p>
         </div>
-        <Link to="/items/new" className="btn btn-primary">➕ Report Item</Link>
+        <Link to="/items/new" className="btn btn-primary">
+          <IconPlus width={16} height={16} />
+          <span>Report Item</span>
+        </Link>
       </div>
 
       {/* ── Search & Filter Controls ── */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-body" style={{ paddingBottom: 16 }}>
-          <div className="search-bar" style={{ marginBottom: 0 }}>
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-body" style={{ padding: '20px 24px' }}>
+          <div className="search-bar">
             {/* Keyword Search */}
-            <div className="search-input-wrap" style={{ minWidth: 220 }}>
-              <span className="search-icon">🔍</span>
+            <div className="search-input-wrap">
+              <span className="search-icon">
+                <IconSearch width={16} height={16} />
+              </span>
               <input
                 className="form-control"
                 placeholder="Search title, description, location, tags…"
                 value={filters.keyword}
                 onChange={handleFilterChange('keyword')}
+                aria-label="Filter by keyword"
               />
             </div>
 
             {/* Subcategory filter */}
             <input
               className="form-control"
-              style={{ width: 160 }}
+              style={{ width: 170 }}
               placeholder="Filter subcategory…"
               value={filters.subcategory}
               onChange={handleFilterChange('subcategory')}
+              aria-label="Filter subcategory"
             />
 
             {/* Type */}
@@ -152,6 +199,7 @@ export default function ItemsPage() {
               style={{ width: 120 }}
               value={filters.type}
               onChange={handleFilterChange('type')}
+              aria-label="Filter type"
             >
               <option value="">All types</option>
               <option value="lost">Lost</option>
@@ -161,9 +209,10 @@ export default function ItemsPage() {
             {/* Category */}
             <select
               className="form-control"
-              style={{ width: 140 }}
+              style={{ width: 150 }}
               value={filters.category_id}
               onChange={handleFilterChange('category_id')}
+              aria-label="Filter category"
             >
               <option value="">All categories</option>
               {categories.map(c => (
@@ -174,9 +223,10 @@ export default function ItemsPage() {
             {/* Location */}
             <select
               className="form-control"
-              style={{ width: 140 }}
+              style={{ width: 150 }}
               value={filters.location_id}
               onChange={handleFilterChange('location_id')}
+              aria-label="Filter location"
             >
               <option value="">All locations</option>
               {locations.map(l => (
@@ -187,9 +237,10 @@ export default function ItemsPage() {
             {/* Status */}
             <select
               className="form-control"
-              style={{ width: 120 }}
+              style={{ width: 125 }}
               value={filters.status}
               onChange={handleFilterChange('status')}
+              aria-label="Filter status"
             >
               <option value="">All statuses</option>
               <option value="active">Active</option>
@@ -198,41 +249,62 @@ export default function ItemsPage() {
             </select>
 
             {/* Clearly Labeled Date Range */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="text-xs text-muted font-semibold">From:</span>
               <input
                 className="form-control"
                 type="date"
-                style={{ width: 135 }}
+                style={{ width: 140 }}
                 value={filters.date_from}
                 onChange={handleFilterChange('date_from')}
+                aria-label="Date from"
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="text-xs text-muted font-semibold">To:</span>
               <input
                 className="form-control"
                 type="date"
-                style={{ width: 135 }}
+                style={{ width: 140 }}
                 value={filters.date_to}
                 onChange={handleFilterChange('date_to')}
+                aria-label="Date to"
               />
             </div>
 
-            <button className="btn btn-ghost btn-sm" onClick={clearFilters}>Reset</button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={clearFilters}
+              style={{ minHeight: 40 }}
+            >
+              <IconFilter width={14} height={14} />
+              <span>Reset</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* ── Item Cards Grid ── */}
       {loading ? (
-        <div className="loading-center"><div className="spinner" /></div>
+        <div className="loading-center">
+          <div className="spinner" />
+          <p className="text-sm">Loading reports…</p>
+        </div>
       ) : items.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📭</div>
-          <h3>No items found</h3>
-          <p>Try resetting filters or <Link to="/items/new">report a new item</Link>.</p>
+        <div className="empty-state card">
+          <div className="empty-icon-wrap">
+            <IconFolder width={24} height={24} />
+          </div>
+          <h3>No items match your filters</h3>
+          <p>Try resetting the filters or report a new lost or found item.</p>
+          <div style={{ marginTop: 16 }}>
+            <Link to="/items/new" className="btn btn-primary btn-sm">
+              <IconPlus width={14} height={14} />
+              <span>Report New Item</span>
+            </Link>
+          </div>
         </div>
       ) : (
         <>
@@ -247,21 +319,25 @@ export default function ItemsPage() {
           </div>
 
           {pages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 32 }}>
               <button
-                className="btn btn-ghost btn-sm"
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setPage(p => p - 1)}
                 disabled={page <= 1}
               >
-                ← Prev
+                <IconArrowLeft width={14} height={14} />
+                <span>Prev</span>
               </button>
-              <span className="text-sm text-muted">Page {page} of {pages}</span>
+              <span className="text-sm text-muted font-semibold">Page {page} of {pages}</span>
               <button
-                className="btn btn-ghost btn-sm"
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setPage(p => p + 1)}
                 disabled={page >= pages}
               >
-                Next →
+                <span>Next</span>
+                <IconArrowRight width={14} height={14} />
               </button>
             </div>
           )}
