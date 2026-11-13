@@ -8,16 +8,16 @@ afterAll(async () => { await pool.end(); });
 
 describe('Relevance Matching Engine – scoreItems()', () => {
   const base = {
-    category_id:        1, // Electronics
+    category_id: 1, // Electronics
     custom_subcategory: 'Wireless Earbuds',
-    location_id:        1, // Main Library
-    custom_location:    '2nd Floor Reading Area',
-    date_occurred:      new Date().toISOString(),
-    title:              'Black Boat wireless earbuds',
-    description:        'Lost black Boat earbuds with charging case near the quiet desks.',
-    tags:               'boat,earbuds,black',
-    color:              'Black',
-    brand:              'Boat',
+    location_id: 1, // Main Library
+    custom_location: '2nd Floor Reading Area',
+    date_occurred: new Date().toISOString(),
+    title: 'Black Boat wireless earbuds',
+    description: 'Lost black Boat earbuds with charging case near the quiet desks.',
+    tags: 'boat,earbuds,black',
+    color: 'Black',
+    brand: 'Boat',
   };
 
   test('Perfect match with identical subcategory & specific location scores high (≥ 80)', () => {
@@ -49,18 +49,20 @@ describe('Relevance Matching Engine – scoreItems()', () => {
     expect(sim).toBeGreaterThanOrEqual(0.25);
   });
 
-  test('Missing optional custom subcategory does not penalise score (rescales across available dimensions)', () => {
+  test('Missing optional custom subcategory does not inflate score', () => {
     const withoutSubcat = { ...base, custom_subcategory: null };
     const result = scoreItems(base, withoutSubcat);
-    // Missing subcategory is neutral and does not drop score significantly
-    expect(result.score).toBeGreaterThanOrEqual(85);
+    // Custom subcategory score should be 0 because one item is missing it
+    const fullMatch = scoreItems(base, { ...base });
+    expect(result.score).toBeLessThanOrEqual(fullMatch.score - 15);
   });
 
-  test('Both items having empty custom_subcategory rescales without penalty', () => {
+  test('Both items having empty custom_subcategory gets 0 subcategory points (no inflation)', () => {
     const a = { ...base, custom_subcategory: null };
     const b = { ...base, custom_subcategory: null };
+    const resultWith = scoreItems(base, { ...base });
     const resultBothEmpty = scoreItems(a, b);
-    expect(resultBothEmpty.score).toBeGreaterThanOrEqual(90);
+    expect(resultBothEmpty.score).toBe(resultWith.score - 20);
   });
 
   test('Different category loses category points and strong boost', () => {

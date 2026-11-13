@@ -91,99 +91,14 @@ const SYNONYMS = {
   card: 'idcard',
   id: 'idcard',
   idcard: 'idcard',
-  badge: 'idcard',
-
-  // Keys
-  keys: 'key',
-  key: 'key',
-  keychain: 'key',
-  keyring: 'key',
-
-  // Umbrella
-  umbrella: 'umbrella',
-  parasol: 'umbrella',
-
-  // Notebook / Book / Diary
-  notebook: 'book',
-  book: 'book',
-  diary: 'book',
-  journal: 'book',
-  textbook: 'book',
-  notepad: 'book',
-  binder: 'book',
-
-  // Pendrive / USB / Flash drive
-  pendrive: 'usb',
-  usb: 'usb',
-  flashdrive: 'usb',
-  thumbdrive: 'usb',
-  drive: 'usb',
-
-  // Watch / Smartwatch
-  watch: 'watch',
-  smartwatch: 'watch',
-  iwatch: 'watch',
-  fitbit: 'watch',
-  smartband: 'watch',
-  band: 'watch',
-
-  // Power bank
-  powerbank: 'powerbank',
-
-  // Colors
-  grey: 'gray',
-  gray: 'gray',
-  navy: 'blue',
-  maroon: 'red',
-  golden: 'gold',
-  gold: 'gold',
-  silver: 'silver',
-  rose: 'pink'
+  keys: 'keys',
+  keychain: 'keys'
 };
-
-function stemPlural(word) {
-  if (!word || word.length <= 3) return word;
-  if (word.endsWith('ies') && word.length > 4) {
-    return word.slice(0, -3) + 'y';
-  }
-  if (word.endsWith('ses') && !word.endsWith('sses') && word.length > 4) {
-    return word.slice(0, -1);
-  }
-  if (word.endsWith('xes') || word.endsWith('ches') || word.endsWith('shes')) {
-    return word.slice(0, -2);
-  }
-  if (word.endsWith('s') && !word.endsWith('ss') && !word.endsWith('us') && !word.endsWith('is')) {
-    return word.slice(0, -1);
-  }
-  return word;
-}
 
 function normaliseWord(word) {
   let clean = word.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!clean || clean.length < 2) return null;
-  if (SYNONYMS[clean]) clean = SYNONYMS[clean];
-  clean = stemPlural(clean);
-  if (SYNONYMS[clean]) clean = SYNONYMS[clean];
-  return clean;
-}
-
-function prepareText(str) {
-  if (!str) return '';
-  return str.toLowerCase()
-    .replace(/\bpower\s+bank\b/g, 'powerbank')
-    .replace(/\bflash\s+drive\b/g, 'usb')
-    .replace(/\busb\s+drive\b/g, 'usb')
-    .replace(/\bpen\s+drive\b/g, 'usb')
-    .replace(/\bstudent\s+id\b/g, 'idcard')
-    .replace(/\bcollege\s+id\b/g, 'idcard')
-    .replace(/\bid\s+card\b/g, 'idcard')
-    .replace(/\bair\s*pods\b/g, 'earphones')
-    .replace(/\bear\s*buds\b/g, 'earphones')
-    .replace(/\bear\s*phones\b/g, 'earphones')
-    .replace(/\bhead\s*phones\b/g, 'earphones')
-    .replace(/\bsmart\s*watch\b/g, 'watch')
-    .replace(/\bkey\s*chain\b/g, 'key')
-    .replace(/\bkey\s*ring\b/g, 'key');
+  return SYNONYMS[clean] || clean;
 }
 
 function tokenise(str) {
@@ -222,69 +137,18 @@ function textSimilarity(a, b) {
     }
   }
 
-  const minSize = Math.min(setA.size, setB.size);
-  const cappedShared = Math.min(minSize, shared);
-  const overlap = minSize > 0 ? cappedShared / minSize : 0;
-  const union = setA.size + setB.size - cappedShared;
-  const jaccard = union > 0 ? Math.min(1, Math.max(0, cappedShared / union)) : 0;
-  return Math.min(1, Math.max(0, 0.7 * overlap + 0.3 * jaccard));
+  const union = setA.size + setB.size - shared;
+  return union > 0 ? Math.min(1, shared / union) : 0;
 }
 
-function normaliseColor(c) {
-  if (!c || typeof c !== 'string') return null;
-  const clean = c.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-  if (!clean) return null;
-  return SYNONYMS[clean] || clean;
-}
-
-function normaliseBrand(b) {
-  if (!b || typeof b !== 'string') return null;
-  const clean = b.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-  if (!clean) return null;
-  return clean;
-}
-
-function dateSimilarity(d1, d2, type1, type2) {
-  if (!d1 || !d2) return null;
-  const date1 = new Date(d1);
-  const date2 = new Date(d2);
-  if (isNaN(date1.getTime()) || isNaN(date2.getTime())) return null;
-
-  let lostDate, foundDate;
-  if (type1 === 'lost' && type2 === 'found') {
-    lostDate = date1;
-    foundDate = date2;
-  } else if (type1 === 'found' && type2 === 'lost') {
-    lostDate = date2;
-    foundDate = date1;
-  }
-
-  if (lostDate && foundDate) {
-    const diffDays = (foundDate - lostDate) / 86400000;
-    if (diffDays >= 0) {
-      // Found reported on or after lost date: don't penalise 0-3 days gap
-      if (diffDays <= 3)  return 1.0;
-      if (diffDays <= 7)  return 0.8;
-      if (diffDays <= 14) return 0.6;
-      if (diffDays <= 30) return 0.4;
-      if (diffDays <= 60) return 0.2;
-      return 0;
-    } else {
-      // Found reported before lost date (unusual)
-      const absDiff = Math.abs(diffDays);
-      if (absDiff <= 1)  return 0.8;
-      if (absDiff <= 3)  return 0.5;
-      if (absDiff <= 7)  return 0.3;
-      return 0;
-    }
-  }
-
-  const diff = Math.abs(date1 - date2) / 86400000;
-  if (diff <= 3)  return 1.0;
-  if (diff <= 7)  return 0.8;
-  if (diff <= 14) return 0.6;
-  if (diff <= 30) return 0.4;
-  if (diff <= 60) return 0.2;
+function dateSimilarity(d1, d2) {
+  if (!d1 || !d2) return 0.2;
+  const diff = Math.abs(new Date(d1) - new Date(d2)) / 86400000;
+  if (diff <= 1)  return 1.0;
+  if (diff <= 3)  return 0.8;
+  if (diff <= 7)  return 0.6;
+  if (diff <= 14) return 0.4;
+  if (diff <= 30) return 0.2;
   return 0;
 }
 
@@ -303,8 +167,7 @@ function dateSimilarity(d1, d2, type1, type2) {
  * A +10 bonus is added for strong matches.
  */
 function scoreItems(a, b) {
-  let earnedPoints = 0;
-  let maxPossiblePoints = 0;
+  let score = 0;
   const factors = [];
 
   // 1. Category (weight 15)
@@ -368,71 +231,42 @@ function scoreItems(a, b) {
   if (a.custom_subcategory && b.custom_subcategory) {
     maxPossiblePoints += 10;
     const subcatSim = textSimilarity(a.custom_subcategory, b.custom_subcategory);
-    earnedPoints += subcatSim * 10;
-    if (subcatSim >= 0.4) {
-      factors.push('Matching subcategory');
+    const subcatPoints = Math.round(subcatSim * 20);
+    score += subcatPoints;
+    if (subcatPoints >= 6) factors.push('Matching subcategory');
+  }
+
+  // 3. Title & Description similarity: 30 points
+  const textA = `${a.title || ''} ${a.description || ''} ${a.tags || ''} ${a.color || ''} ${a.brand || ''}`;
+  const textB = `${b.title || ''} ${b.description || ''} ${b.tags || ''} ${b.color || ''} ${b.brand || ''}`;
+  const descSim = textSimilarity(textA, textB);
+  const descPoints = Math.round(descSim * 30);
+  score += descPoints;
+  if (descPoints >= 12) factors.push('Similar description');
+
+  // 4. Main and Specific Location similarity: 20 points
+  // Main location: up to 12 points
+  let locPoints = 0;
+  if (a.location_id && b.location_id && a.location_id === b.location_id) {
+    locPoints += 12;
+    // Specific location: up to 8 points if both provided
+    if (a.custom_location && b.custom_location) {
+      const specLocSim = textSimilarity(a.custom_location, b.custom_location);
+      locPoints += Math.round(specLocSim * 8);
     }
+  } else if (a.custom_location && b.custom_location) {
+    // Both specified custom locations without matching campus location
+    const specLocSim = textSimilarity(a.custom_location, b.custom_location);
+    locPoints += Math.round(specLocSim * 12);
   }
+  score += locPoints;
+  if (locPoints >= 10) factors.push('Nearby location');
 
-  // 6. Location (weight 15)
-  const hasCampusLoc = a.location_id && b.location_id;
-  const hasCustomLoc = a.custom_location && b.custom_location;
-  if (hasCampusLoc || hasCustomLoc) {
-    maxPossiblePoints += 15;
-    let locEarned = 0;
-    if (hasCampusLoc && a.location_id === b.location_id) {
-      locEarned = 15;
-      factors.push('Same location');
-      if (hasCustomLoc) {
-        const specSim = textSimilarity(a.custom_location, b.custom_location);
-        if (specSim >= 0.4) {
-          locEarned += 2; // bonus when matching specific spot
-          factors.push('Same specific spot');
-        }
-      }
-    } else if (hasCampusLoc && a.location_id !== b.location_id) {
-      // Different campus locations -> 40% partial credit (6 points)
-      locEarned = 15 * 0.4;
-      if (hasCustomLoc) {
-        const specSim = textSimilarity(a.custom_location, b.custom_location);
-        locEarned += specSim * (15 * 0.6);
-      }
-      if (locEarned >= 8) {
-        factors.push('Nearby location');
-      }
-    } else if (hasCustomLoc) {
-      const specSim = textSimilarity(a.custom_location, b.custom_location);
-      locEarned = specSim * 15;
-      if (locEarned >= 8) {
-        factors.push('Nearby location');
-      }
-    }
-    earnedPoints += Math.min(17, locEarned);
-  }
-
-  // 7. Date (weight 5)
-  const ds = dateSimilarity(a.date_occurred, b.date_occurred, a.type, b.type);
-  if (ds !== null) {
-    maxPossiblePoints += 5;
-    earnedPoints += ds * 5;
-    if (ds >= 0.8) {
-      factors.push('Close date');
-    }
-  }
-
-  if (maxPossiblePoints === 0) {
-    return { score: 0, factors: 'No data' };
-  }
-
-  let finalScore = (earnedPoints / maxPossiblePoints) * 100;
-
-  // 8. Strong match boost:
-  // if category matches AND (title similarity >= 0.6 OR (color and brand both match)), add +10 bonus
-  const categoryMatches = Boolean(a.category_id && b.category_id && a.category_id === b.category_id);
-  const strongMatch = categoryMatches && (titleSim >= 0.58 || (colorMatches && brandMatches));
-  if (strongMatch) {
-    finalScore += 10;
-  }
+  // 5. Date proximity: 10 points
+  const ds = dateSimilarity(a.date_occurred, b.date_occurred);
+  const datePoints = Math.round(ds * 10);
+  score += datePoints;
+  if (datePoints >= 8) factors.push('Close date');
 
   return {
     score: Math.min(100, Math.max(0, Math.round(finalScore))),
@@ -461,7 +295,7 @@ async function runMatching(itemId) {
     const { score, factors } = scoreItems(item, candidate);
     if (score < 25) continue;
 
-    const lostId  = item.type === 'lost' ? item.id : candidate.id;
+    const lostId = item.type === 'lost' ? item.id : candidate.id;
     const foundId = item.type === 'lost' ? candidate.id : item.id;
 
     // Check existing match to avoid duplicate notifications
@@ -530,13 +364,4 @@ async function getUserMatches(userId) {
   return rows;
 }
 
-module.exports = {
-  scoreItems,
-  runMatching,
-  getUserMatches,
-  textSimilarity,
-  normaliseWord,
-  tokenise,
-  SYNONYMS,
-  STOPWORDS
-};
+module.exports = { scoreItems, runMatching, getUserMatches, textSimilarity, SYNONYMS };

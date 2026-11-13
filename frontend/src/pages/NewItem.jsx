@@ -2,18 +2,20 @@
 // Report Lost or Found belongings with Category, optional custom Subcategory, Campus Location, and Specific Location.
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../utils/api.js';
 import toast from 'react-hot-toast';
+import { IconAlertCircle, IconBox, IconCheck } from '../components/Icons.jsx';
 
 export default function NewItem() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
-    type: 'lost',
+    type: location.state?.type || 'lost',
     title: '',
     description: '',
     category_id: '',
@@ -57,7 +59,7 @@ export default function NewItem() {
   }
 
   return (
-    <div style={{ maxWidth: 680 }}>
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
       <div className="page-header">
         <div>
           <h1>Report an Item</h1>
@@ -76,17 +78,19 @@ export default function NewItem() {
               <div className="type-toggle">
                 <button
                   type="button"
-                  className={`type-btn lost ${form.type === 'lost' ? 'active font-bold' : ''}`}
+                  className={`type-btn lost ${form.type === 'lost' ? 'active' : ''}`}
                   onClick={() => setForm(prev => ({ ...prev, type: 'lost' }))}
                 >
-                  🔴 Lost Item
+                  <IconAlertCircle width={16} height={16} />
+                  <span>Lost Item</span>
                 </button>
                 <button
                   type="button"
-                  className={`type-btn found ${form.type === 'found' ? 'active font-bold' : ''}`}
+                  className={`type-btn found ${form.type === 'found' ? 'active' : ''}`}
                   onClick={() => setForm(prev => ({ ...prev, type: 'found' }))}
                 >
-                  🟢 Found Item
+                  <IconBox width={16} height={16} />
+                  <span>Found Item</span>
                 </button>
               </div>
             </div>
@@ -133,7 +137,7 @@ export default function NewItem() {
                 <label className="form-label">Subcategory (Optional)</label>
                 <input
                   className="form-control"
-                  placeholder="e.g. Wireless Earbuds, Scientific Calculator, Laptop Charger"
+                  placeholder="e.g. Wireless Earbuds, Scientific Calculator"
                   value={form.custom_subcategory}
                   onChange={setField('custom_subcategory')}
                 />
@@ -160,7 +164,7 @@ export default function NewItem() {
                 <label className="form-label">Specific Location / Landmark</label>
                 <input
                   className="form-control"
-                  placeholder="e.g. 2nd Floor Reading Area, Near Staircase, Lab Table 5"
+                  placeholder="e.g. 2nd Floor Reading Area, Lab Table 5"
                   value={form.custom_location}
                   onChange={setField('custom_location')}
                 />
@@ -212,10 +216,10 @@ export default function NewItem() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 10 }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 14 }}>
               <button
                 type="button"
-                className="btn btn-ghost"
+                className="btn btn-secondary"
                 onClick={() => navigate('/items')}
               >
                 Cancel
@@ -225,7 +229,7 @@ export default function NewItem() {
                 className="btn btn-primary"
                 disabled={loading}
               >
-                {loading ? 'Submitting…' : '📤 Submit Report'}
+                {loading ? 'Submitting…' : 'Submit Report'}
               </button>
             </div>
           </form>
